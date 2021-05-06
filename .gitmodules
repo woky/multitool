@@ -1,0 +1,3 @@
+[submodule "python-chmod-monkey"]
+	path = python-chmod-monkey
+	url = https://github.com/Toilal/python-chmod-monkey
