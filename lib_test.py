@@ -1,13 +1,20 @@
-import lib
-import pytest
 import types
+from contextvars import copy_context
 from typing import Tuple
 
-def test_parse_chown_usergroup(monkeypatch):
+import pytest
 
-    uid_by_name = { 'alice': 1, 'bob': 2, 'cyril': 3 }
-    gid_by_name = { 'alice': 1, 'bob': 3, 'adm': 4 }
-    prim_gid_by_uid = { 1: 1, 2: 3, 3: 4 }
+import lib
+
+
+def test_parse_chown_usergroup(monkeypatch):
+    ctx = copy_context()
+    ctx.run(_test_parse_chown_usergroup)
+
+def _test_parse_chown_usergroup():
+    uid_by_name = {'alice': 1, 'bob': 2, 'cyril': 3}
+    gid_by_name = {'alice': 1, 'bob': 3, 'adm': 4}
+    prim_gid_by_uid = {1: 1, 2: 3, 3: 4}
 
     def test_getpwuid(uid: int):
         return types.SimpleNamespace(pw_uid=uid, pw_gid=prim_gid_by_uid[uid])
@@ -16,26 +23,29 @@ def test_parse_chown_usergroup(monkeypatch):
     def test_getgrnam(name: str):
         return types.SimpleNamespace(gr_gid=gid_by_name[name])
 
-    monkeypatch.setattr('pwd.getpwuid', test_getpwuid)
-    monkeypatch.setattr('pwd.getpwnam', test_getpwnam)
-    monkeypatch.setattr('grp.getgrnam', test_getgrnam)
+    class TestOSFunctions(lib.OSFunctions):
+        getpwuid = test_getpwuid
+        getpwnam = test_getpwnam
+        getgrnam = test_getgrnam
+
+    lib.osfuns.set(TestOSFunctions)
 
     # try both colon and dot
     def parse_wrapper(usergroup: str) -> Tuple[int, int]:
         usergroup_dot = usergroup.replace(':', '.', 1)
         if usergroup == usergroup_dot:
-            return lib.parse_chown_usergroup(usergroup) 
+            return lib.parse_chown_usergroup(usergroup)
         try:
-            r1 = lib.parse_chown_usergroup(usergroup) 
+            r1 = lib.parse_chown_usergroup(usergroup)
             try:
-                r2 = lib.parse_chown_usergroup(usergroup_dot) 
+                r2 = lib.parse_chown_usergroup(usergroup_dot)
             except lib.UserError:
                 assert False
             assert r1 == r2
             return r1
         except lib.UserError as e:
             with pytest.raises(lib.UserError):
-                lib.parse_chown_usergroup(usergroup_dot) 
+                lib.parse_chown_usergroup(usergroup_dot)
             raise e
 
     # known user name
@@ -162,4 +172,3 @@ def test_parse_chown_usergroup(monkeypatch):
     assert parse_wrapper('4:') == (4, 4)
     assert parse_wrapper('5:') == (5, 5)
     assert parse_wrapper('65534:') == (65534, 65534)
-

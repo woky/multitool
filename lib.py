@@ -1,6 +1,7 @@
 import grp
 import pwd
-from typing import Callable, Tuple
+from contextvars import ContextVar
+from typing import Callable, Tuple, Type
 
 
 class UserError(Exception):
@@ -8,20 +9,13 @@ class UserError(Exception):
         super().__init__(self, msg)
 
 class OSFunctions:
+    getpwuid = pwd.getpwuid
+    getpwnam = pwd.getpwnam
+    getgrnam = grp.getgrnam
 
-    @staticmethod
-    def getpwnam(uname: str) -> pwd.struct_passwd:
-        return pwd.getpwnam(uname)
+osfuns: ContextVar[Type[OSFunctions]] = ContextVar('osfuns', default=OSFunctions)
 
-    @staticmethod
-    def getpwuid(uid: int) -> pwd.struct_passwd:
-        return pwd.getpwuid(uid)
-
-    @staticmethod
-    def getgrnam(gname: str) -> grp.struct_group:
-        return grp.getgrnam(gname)
-
-def parse_chown_usergroup(usergroup: str, osfns=OSFunctions) -> Tuple[int, int]:
+def parse_chown_usergroup(usergroup: str) -> Tuple[int, int]:
     sep_idx = usergroup.find(':')
     if sep_idx == -1:
         # undocumented but supported by both coreutils and busybox
@@ -36,8 +30,8 @@ def parse_chown_usergroup(usergroup: str, osfns=OSFunctions) -> Tuple[int, int]:
             except KeyError:
                 raise UserError('Unknown user/group ' + name)
 
-    uname2uid = lambda name: osfns.getpwnam(name).pw_uid
-    gname2gid = lambda name: osfns.getgrnam(name).gr_gid
+    uname2uid = lambda name: osfuns.get().getpwnam(name).pw_uid
+    gname2gid = lambda name: osfuns.get().getgrnam(name).gr_gid
 
     if sep_idx == -1:
         # 'user'
@@ -58,12 +52,12 @@ def parse_chown_usergroup(usergroup: str, osfns=OSFunctions) -> Tuple[int, int]:
             # 'uid:' works in busybox, not in coreutils
             uid = int(user_spec)
             try:
-                gid = osfns.getpwuid(uid).pw_gid
+                gid = osfuns.get().getpwuid(uid).pw_gid
             except KeyError:
                 gid = uid
         except ValueError:
             try:
-                pwd_entry = osfns.getpwnam(user_spec)
+                pwd_entry = osfuns.get().getpwnam(user_spec)
                 uid = pwd_entry.pw_uid
                 gid = pwd_entry.pw_gid
             except KeyError:
