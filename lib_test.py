@@ -7,11 +7,7 @@ import pytest
 import lib
 
 
-def test_parse_chown_usergroup(monkeypatch):
-    ctx = copy_context()
-    ctx.run(_test_parse_chown_usergroup)
-
-def _test_parse_chown_usergroup():
+def test_parse_chown_usergroup():
     uid_by_name = {'alice': 1, 'bob': 2, 'cyril': 3}
     gid_by_name = {'alice': 1, 'bob': 3, 'adm': 4}
     prim_gid_by_uid = {1: 1, 2: 3, 3: 4}
@@ -28,24 +24,23 @@ def _test_parse_chown_usergroup():
         getpwnam = test_getpwnam
         getgrnam = test_getgrnam
 
-    lib.osfuns.set(TestOSFunctions)
-
-    # try both colon and dot
     def parse_wrapper(usergroup: str) -> Tuple[int, int]:
+        _call = lambda ug: lib.parse_chown_usergroup(ug, osfns=TestOSFunctions)
+        # try both colon and dot
         usergroup_dot = usergroup.replace(':', '.', 1)
         if usergroup == usergroup_dot:
-            return lib.parse_chown_usergroup(usergroup)
+            return _call(usergroup)
         try:
-            r1 = lib.parse_chown_usergroup(usergroup)
+            r1 = _call(usergroup)
             try:
-                r2 = lib.parse_chown_usergroup(usergroup_dot)
+                r2 = _call(usergroup_dot)
             except lib.UserError:
                 assert False
             assert r1 == r2
             return r1
         except lib.UserError as e:
             with pytest.raises(lib.UserError):
-                lib.parse_chown_usergroup(usergroup_dot)
+                _call(usergroup_dot)
             raise e
 
     # known user name
