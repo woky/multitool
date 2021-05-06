@@ -71,14 +71,18 @@ def parse_chown_usergroup(usergroup: str, osfns=OSFunctions) -> Tuple[int, int]:
 def recurse_action(
         file: str,
         action: Callable[[str, os.stat_result], bool],
-        recurse: bool = False,
-        pre_order: bool = False,
-        follow_top_symlink: bool = False,
-        follow_child_symlinks: bool = False,
-        depth: int = 0,  # unused for now
-        visited: Set[Tuple[int, int]] = set(),
+        recurse=False,
+        pre_order=False,
+        follow_top_symlink=False,
+        follow_child_symlinks=False,
+        sort_dirs=False,
+        depth=0,  # unused for now
+        visited: Set[Tuple[int, int]] = None,
         osfns=OSFunctions):
     """ """
+
+    if visited is None:
+        visited = set()
 
     file_stat = osfns.stat(file, follow_symlinks=follow_top_symlink)
 
@@ -94,7 +98,11 @@ def recurse_action(
         if action(file, file_stat):
             return
 
-    for child in osfns.scandir(file):
+    dir_iter = osfns.scandir(file)
+    if sort_dirs:
+        dir_iter = sorted(dir_iter, key=lambda e: e.name)
+
+    for child in dir_iter:
         recurse_action(
             str(child.path),
             action,
@@ -102,6 +110,7 @@ def recurse_action(
             pre_order=pre_order,
             follow_top_symlink=follow_child_symlinks,
             follow_child_symlinks=follow_child_symlinks,
+            sort_dirs=sort_dirs,
             depth=(depth + 1),
             visited=visited,
             osfns=OSFunctions)

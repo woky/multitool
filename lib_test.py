@@ -1,5 +1,8 @@
+import os.path
 import types
-from contextvars import copy_context
+from dataclasses import dataclass
+from pathlib import Path
+import stat
 from typing import Tuple
 
 import pytest
@@ -168,5 +171,209 @@ def test_parse_chown_usergroup():
     assert parse_wrapper('5:') == (5, 5)
     assert parse_wrapper('65534:') == (65534, 65534)
 
-def test_recurse_action(tmp_path):
-    pass
+
+@dataclass
+class TmpRoot:
+    root: Path
+    def mk_f(self, p):      (self.root / p).touch()
+    def mk_d(self, p):      (self.root / p).mkdir()
+    def mk_s(self, p, t):   (self.root / p).symlink_to(t)
+
+def recurse_wrapper(root, start, realpath=False, **kwargs):
+    walk_list = []
+    def action(p, st: os.stat_result):
+        if realpath and not stat.S_ISLNK(st.st_mode):
+            p = os.path.realpath(p)
+        rel_path = p[len(str(root))+1:]
+        walk_list.append(rel_path)
+    lib.recurse_action(os.path.join(root, start), action, sort_dirs=True, **kwargs)
+    return walk_list
+
+def test_recurse_action_basic(tmp_path: Path):
+    root = TmpRoot(tmp_path)
+    root.mk_d('files')
+    root.mk_d('files/A')
+    root.mk_f('files/A/x')
+    root.mk_f('files/A/y')
+    root.mk_d('files/A/A')
+    root.mk_f('files/A/A/x')
+    root.mk_f('files/A/A/y')
+    root.mk_d('files/A/B')
+    root.mk_d('files/A/C')
+    root.mk_f('files/A/C/x')
+
+    assert recurse_wrapper(tmp_path, 'files/A') == ['files/A']
+    assert recurse_wrapper(tmp_path, 'files/A/x') == ['files/A/x']
+    assert recurse_wrapper(tmp_path, 'files', recurse=True) == [
+        'files/A/A/x',
+        'files/A/A/y',
+        'files/A/A',
+        'files/A/B',
+        'files/A/C/x',
+        'files/A/C',
+        'files/A/x',
+        'files/A/y',
+        'files/A',
+        'files',
+    ]
+    assert recurse_wrapper(tmp_path, 'files', recurse=True, pre_order=True) == [
+        'files',
+        'files/A',
+        'files/A/A',
+        'files/A/A/x',
+        'files/A/A/y',
+        'files/A/B',
+        'files/A/C',
+        'files/A/C/x',
+        'files/A/x',
+        'files/A/y',
+    ]
+
+def test_recurse_action_symlinks(tmp_path: Path):
+    root = TmpRoot(tmp_path)
+    root.mk_d('files')
+    root.mk_d('files/A')
+    root.mk_f('files/A/x')
+    root.mk_f('files/A/y')
+    root.mk_s('files/A/B', '../B/B')
+    root.mk_d('files/B')
+    root.mk_f('files/B/x')
+    root.mk_f('files/B/y')
+    root.mk_s('files/B/ax', '../A/x')
+    root.mk_s('files/B/A', '../A')
+    root.mk_d('files/B/B')
+    root.mk_f('files/B/B/x')
+    root.mk_f('files/B/B/y')
+    root.mk_s('files/B/B/A', '../../A')
+
+    no_follow_pre = [
+        'files/A/B',
+        'files/A/x',
+        'files/A/y',
+        'files/A',
+        'files/B/A',
+        'files/B/B/A',
+        'files/B/B/x',
+        'files/B/B/y',
+        'files/B/B',
+        'files/B/ax',
+        'files/B/x',
+        'files/B/y',
+        'files/B',
+        'files',
+    ]
+    assert recurse_wrapper(tmp_path, 'files',
+            realpath=False, recurse=True) == no_follow_pre
+    assert recurse_wrapper(tmp_path, 'files',
+            realpath=True, recurse=True) == no_follow_pre
+
+    no_follow_post = [
+        'files',
+        'files/A',
+        'files/A/B',
+        'files/A/x',
+        'files/A/y',
+        'files/B',
+        'files/B/A',
+        'files/B/B',
+        'files/B/B/A',
+        'files/B/B/x',
+        'files/B/B/y',
+        'files/B/ax',
+        'files/B/x',
+        'files/B/y',
+    ]
+    assert recurse_wrapper(tmp_path, 'files',
+            realpath=False, recurse=True, pre_order=True) == no_follow_post
+    assert recurse_wrapper(tmp_path, 'files',
+            realpath=True, recurse=True, pre_order=True) == no_follow_post
+
+    assert recurse_wrapper(tmp_path, 'files/A',
+            realpath=False, recurse=True,
+            follow_top_symlink=True, follow_child_symlinks=True,
+    ) == [
+        'files/A/B/x',
+        'files/A/B/y',
+        'files/A/B',
+        'files/A/x',
+        'files/A/y',
+        'files/A',
+    ]
+    assert recurse_wrapper(tmp_path, 'files/A',
+            realpath=True, recurse=True,
+            follow_top_symlink=True, follow_child_symlinks=True,
+    ) == [
+        'files/B/B/x',
+        'files/B/B/y',
+        'files/B/B',
+        'files/A/x',
+        'files/A/y',
+        'files/A',
+    ]
+    assert recurse_wrapper(tmp_path, 'files/B',
+            realpath=False, recurse=True,
+            follow_top_symlink=True, follow_child_symlinks=True,
+    ) == [
+        'files/B/A/B/x',
+        'files/B/A/B/y',
+        'files/B/A/B',
+        'files/B/A/x',
+        'files/B/A/y',
+        'files/B/A',
+        'files/B/x',
+        'files/B/y',
+        'files/B',
+    ]
+    assert recurse_wrapper(tmp_path, 'files/B',
+            realpath=True, recurse=True,
+            follow_top_symlink=True, follow_child_symlinks=True,
+    ) == [
+        'files/B/B/x',
+        'files/B/B/y',
+        'files/B/B',
+        'files/A/x',
+        'files/A/y',
+        'files/A',
+        'files/B/x',
+        'files/B/y',
+        'files/B',
+    ]
+    assert recurse_wrapper(tmp_path, 'files/A/B',
+            realpath=True, recurse=True,
+            follow_top_symlink=True, follow_child_symlinks=False,
+    ) == [
+        'files/A/B/A',
+        'files/B/B/x',
+        'files/B/B/y',
+        'files/B/B',
+    ]
+    assert recurse_wrapper(tmp_path, 'files',
+            realpath=False, recurse=True,
+            follow_top_symlink=True, follow_child_symlinks=True,
+    ) == [
+        'files/A/B/x',
+        'files/A/B/y',
+        'files/A/B',
+        'files/A/x',
+        'files/A/y',
+        'files/A',
+        'files/B/x',
+        'files/B/y',
+        'files/B',
+        'files',
+    ]
+    assert recurse_wrapper(tmp_path, 'files',
+            realpath=True, recurse=True,
+            follow_top_symlink=True, follow_child_symlinks=True,
+    ) == [
+        'files/B/B/x',
+        'files/B/B/y',
+        'files/B/B',
+        'files/A/x',
+        'files/A/y',
+        'files/A',
+        'files/B/x',
+        'files/B/y',
+        'files/B',
+        'files',
+    ]
