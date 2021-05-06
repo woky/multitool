@@ -1,6 +1,8 @@
 import grp
+import os
 import pwd
-from typing import Callable, Tuple, Type
+import stat
+from typing import Callable, Set, Tuple, Type, Union
 
 
 class UserError(Exception):
@@ -11,8 +13,12 @@ class OSFunctions:
     getpwuid = pwd.getpwuid
     getpwnam = pwd.getpwnam
     getgrnam = grp.getgrnam
+    stat = os.stat
+    scandir = os.scandir
 
 def parse_chown_usergroup(usergroup: str, osfns=OSFunctions) -> Tuple[int, int]:
+    """ """
+
     sep_idx = usergroup.find(':')
     if sep_idx == -1:
         # undocumented but supported by both coreutils and busybox
@@ -61,3 +67,44 @@ def parse_chown_usergroup(usergroup: str, osfns=OSFunctions) -> Tuple[int, int]:
                 raise UserError('Unknown user/group ' + user_spec)
 
     return (uid, gid)
+
+def recurse_action(
+        file: str,
+        action: Callable[[str, os.stat_result], bool],
+        recurse: bool = False,
+        pre_order: bool = False,
+        follow_top_symlink: bool = False,
+        follow_child_symlinks: bool = False,
+        depth: int = 0,  # unused for now
+        visited: Set[Tuple[int, int]] = set(),
+        osfns=OSFunctions):
+    """ """
+
+    file_stat = osfns.stat(file, follow_symlinks=follow_top_symlink)
+
+    file_dev_ino = (file_stat.st_dev, file_stat.st_ino)
+    if file_dev_ino in visited:
+        return
+    visited.add(file_dev_ino)
+
+    if not (stat.S_ISDIR(file_stat.st_mode) and recurse):
+        return action(file, file_stat)
+
+    if pre_order:
+        if action(file, file_stat):
+            return
+
+    for child in osfns.scandir(file):
+        recurse_action(
+            str(child.path),
+            action,
+            recurse=True,
+            pre_order=pre_order,
+            follow_top_symlink=follow_child_symlinks,
+            follow_child_symlinks=follow_child_symlinks,
+            depth=(depth + 1),
+            visited=visited,
+            osfns=OSFunctions)
+
+    if not pre_order:
+        action(file, file_stat)

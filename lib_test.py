@@ -167,3 +167,6 @@ def test_parse_chown_usergroup():
     assert parse_wrapper('4:') == (4, 4)
     assert parse_wrapper('5:') == (5, 5)
     assert parse_wrapper('65534:') == (65534, 65534)
+
+def test_recurse_action(tmp_path):
+    pass
