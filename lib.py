@@ -75,7 +75,7 @@ def recurse_action(
         pre_order=False,
         follow_top_symlink=False,
         follow_child_symlinks=False,
-        sort_dirs=False,
+        sort_dirs=True,
         depth=0,  # unused for now
         visited: Set[Tuple[int, int]] = None,
         osfns=OSFunctions):
