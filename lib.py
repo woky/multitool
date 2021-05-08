@@ -2,7 +2,8 @@ import grp
 import os
 import pwd
 import stat
-from typing import Callable, Set, Tuple, Type, Union
+from dataclasses import dataclass, replace
+from typing import Callable, Optional, Set, Tuple
 
 
 class UserError(Exception):
@@ -68,52 +69,52 @@ def parse_chown_usergroup(usergroup: str, osfns=OSFunctions) -> Tuple[int, int]:
 
     return (uid, gid)
 
+@dataclass
+class RecurseOpts:
+    recurse: bool = False
+    depth_first: bool = False
+    follow_top_symlink: bool = False
+    follow_child_symlinks: bool = False
+    sort_dirs: bool = True
+
 def recurse_action(
         file: str,
         action: Callable[[str, os.stat_result], bool],
-        recurse=False,
-        pre_order=False,
-        follow_top_symlink=False,
-        follow_child_symlinks=False,
-        sort_dirs=True,
+        recurse_opts: RecurseOpts,
         depth=0,  # unused for now
-        visited: Set[Tuple[int, int]] = None,
+        visited: Optional[Set[Tuple[int, int]]] = None,
         osfns=OSFunctions):
     """ """
 
     if visited is None:
         visited = set()
 
-    file_stat = osfns.stat(file, follow_symlinks=follow_top_symlink)
+    file_stat = osfns.stat(file, follow_symlinks=recurse_opts.follow_top_symlink)
 
     file_dev_ino = (file_stat.st_dev, file_stat.st_ino)
     if file_dev_ino in visited:
         return
     visited.add(file_dev_ino)
 
-    if not (stat.S_ISDIR(file_stat.st_mode) and recurse):
+    if not (recurse_opts.recurse and stat.S_ISDIR(file_stat.st_mode)):
         return action(file, file_stat)
 
-    if pre_order:
+    if recurse_opts.depth_first:
         if action(file, file_stat):
             return
 
     dir_iter = osfns.scandir(file)
-    if sort_dirs:
+    if recurse_opts.sort_dirs:
         dir_iter = sorted(dir_iter, key=lambda e: e.name)
 
     for child in dir_iter:
         recurse_action(
             str(child.path),
             action,
-            recurse=True,
-            pre_order=pre_order,
-            follow_top_symlink=follow_child_symlinks,
-            follow_child_symlinks=follow_child_symlinks,
-            sort_dirs=sort_dirs,
+            replace(recurse_opts, follow_top_symlink=recurse_opts.follow_child_symlinks),
             depth=(depth + 1),
             visited=visited,
             osfns=OSFunctions)
 
-    if not pre_order:
+    if not recurse_opts.depth_first:
         action(file, file_stat)

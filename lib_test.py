@@ -186,7 +186,8 @@ def recurse_wrapper(root, start, realpath=False, **kwargs):
             p = os.path.realpath(p)
         rel_path = p[len(str(root))+1:]
         walk_list.append(rel_path)
-    lib.recurse_action(os.path.join(root, start), action, sort_dirs=True, **kwargs)
+    opts = lib.RecurseOpts(sort_dirs=True, **kwargs)
+    lib.recurse_action(os.path.join(root, start), action, opts)
     return walk_list
 
 def test_recurse_action_basic(tmp_path: Path):
@@ -216,7 +217,7 @@ def test_recurse_action_basic(tmp_path: Path):
         'files/A',
         'files',
     ]
-    assert recurse_wrapper(tmp_path, 'files', recurse=True, pre_order=True) == [
+    assert recurse_wrapper(tmp_path, 'files', recurse=True, depth_first=True) == [
         'files',
         'files/A',
         'files/A/A',
@@ -284,9 +285,9 @@ def test_recurse_action_symlinks(tmp_path: Path):
         'files/B/y',
     ]
     assert recurse_wrapper(tmp_path, 'files',
-            realpath=False, recurse=True, pre_order=True) == no_follow_post
+            realpath=False, recurse=True, depth_first=True) == no_follow_post
     assert recurse_wrapper(tmp_path, 'files',
-            realpath=True, recurse=True, pre_order=True) == no_follow_post
+            realpath=True, recurse=True, depth_first=True) == no_follow_post
 
     assert recurse_wrapper(tmp_path, 'files/A',
             realpath=False, recurse=True,
