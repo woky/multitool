@@ -14,7 +14,7 @@ trap failure ERR
 
 multitool()
 {
-	/proj/multitool "$@"
+	/proj/multitool.sh "$@"
 }
 
 show_tree()

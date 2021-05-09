@@ -4,7 +4,7 @@ import getopt
 import sys
 import os
 
-import lib
+from . import lib
 
 def chown_usage(chgrp: bool, exit_code=0, msg=None):
     if chgrp:
@@ -73,7 +73,9 @@ def main_usage(exit_code=0, msg=None):
     usage = f'Usage: {sys.argv[0]} {subcmds} <args>...'
     lib.show_usage(usage, exit_code, msg)
 
-def main(args: list[str]) -> None:
+def main(args: list[str] = None) -> None:
+    if args is None:
+        args = sys.argv[1:]
     try:
         opts, args = getopt.getopt(args, 'h', ['help'])
     except getopt.GetoptError as e:
@@ -89,5 +91,4 @@ def main(args: list[str]) -> None:
     subcmd_fn(args[1:])
 
 if __name__ == '__main__':
-    import sys
-    main(sys.argv[1:])
+    main()

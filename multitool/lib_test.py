@@ -7,7 +7,7 @@ from typing import Tuple
 
 import pytest
 
-import lib
+from . import lib
 
 
 def test_parse_chown_usergroup():
