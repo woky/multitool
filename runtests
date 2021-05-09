@@ -1,0 +1,12 @@
+#!/bin/bash -e
+
+for t in tests/t.*; do
+	echo "Running $t"
+	$t || ret=$?
+	if (( ret != 0 )); then
+		echo "FAIL ($ret)"
+		exit 1
+	else
+		echo "OK"
+	fi
+done

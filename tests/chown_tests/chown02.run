@@ -1,0 +1,2 @@
+#!/bin/sh
+/proj/multitool chown -R news files/B

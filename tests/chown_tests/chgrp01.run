@@ -1,0 +1,2 @@
+#!/bin/sh
+/proj/multitool chgrp -R news files/B
