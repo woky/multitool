@@ -79,8 +79,9 @@ class RecurseOpts:
 
 def recurse_action(
         file: str,
-        action: Callable[[str, os.stat_result], bool],
+        action: Callable[[str, os.stat_result, Optional[object]], bool],
         recurse_opts: RecurseOpts,
+        user_data: Optional[object] = None,
         depth=0,  # unused for now
         visited: Optional[Set[Tuple[int, int]]] = None,
         osfns=OSFunctions):
@@ -97,10 +98,10 @@ def recurse_action(
     visited.add(file_dev_ino)
 
     if not (recurse_opts.recurse and stat.S_ISDIR(file_stat.st_mode)):
-        return action(file, file_stat)
+        return action(file, file_stat, user_data)
 
     if recurse_opts.depth_first:
-        if action(file, file_stat):
+        if action(file, file_stat, user_data):
             return
 
     dir_iter = osfns.scandir(file)
@@ -112,9 +113,10 @@ def recurse_action(
             str(child.path),
             action,
             replace(recurse_opts, follow_top_symlink=recurse_opts.follow_child_symlinks),
+            user_data=user_data,
             depth=(depth + 1),
             visited=visited,
             osfns=OSFunctions)
 
     if not recurse_opts.depth_first:
-        action(file, file_stat)
+        action(file, file_stat, user_data)

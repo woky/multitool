@@ -181,7 +181,7 @@ class TmpRoot:
 
 def recurse_wrapper(root, start, realpath=False, **kwargs):
     walk_list = []
-    def action(p, st: os.stat_result):
+    def action(p, st: os.stat_result, user_data):
         if realpath and not stat.S_ISLNK(st.st_mode):
             p = os.path.realpath(p)
         rel_path = p[len(str(root))+1:]
