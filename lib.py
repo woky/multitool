@@ -1,10 +1,14 @@
-import grp
-import os
-import pwd
-import stat
+import pwd, grp
+import sys, os, stat
 from dataclasses import dataclass, replace
 from typing import Callable, Optional, Set, Tuple
 
+def show_usage(usage, exit_code=0, msg=None):
+    out = sys.stderr if exit_code else sys.stdout
+    if msg:
+        print(str(msg), file=out)
+    print(usage, file=out)
+    sys.exit(exit_code)
 
 class UserError(Exception):
     def __init__(self, msg):
@@ -32,7 +36,7 @@ def parse_chown_usergroup(usergroup: str, osfns=OSFunctions) -> Tuple[int, int]:
             try:
                 return name2id(name)
             except KeyError:
-                raise UserError('Unknown user/group ' + name)
+                raise UserError(f"unknown user/group '{name}'")
 
     uname2uid = lambda name: osfns.getpwnam(name).pw_uid
     gname2gid = lambda name: osfns.getgrnam(name).gr_gid
@@ -65,7 +69,7 @@ def parse_chown_usergroup(usergroup: str, osfns=OSFunctions) -> Tuple[int, int]:
                 uid = pwd_entry.pw_uid
                 gid = pwd_entry.pw_gid
             except KeyError:
-                raise UserError('Unknown user/group ' + user_spec)
+                raise UserError(f"unknown user/group 'user_spec'")
 
     return (uid, gid)
 
