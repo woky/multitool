@@ -14,7 +14,7 @@ def chown_usage(chgrp: bool, exit_code=0, msg=None):
     lib.show_usage(usage, exit_code, msg)
 
 def do_chown(args: list[str], chgrp=False):
-    opts, args = getopt.getopt(args, 'hRHLP', ['help', 'dereference'])
+    opts, args = getopt.getopt(args, 'hRHLP', ['help'])
     if len(args) < 2:
         chown_usage(chgrp, 1)
     usergroup, files = args[0], args[1:]
@@ -22,13 +22,11 @@ def do_chown(args: list[str], chgrp=False):
         usergroup = ':' + usergroup
     recurse_opts = lib.RecurseOpts()
     chown_fn = os.chown
-    explicit_deref = False
     for opt, optarg in opts:
         if opt == '-h':
             if not args:
                 chown_usage(chgrp)
             chown_fn = os.lchown
-            explicit_deref = True
         elif opt == '--help':
             chown_usage(chgrp)
         elif opt == '-R':
@@ -42,10 +40,7 @@ def do_chown(args: list[str], chgrp=False):
         elif opt == '-P':
             recurse_opts.follow_top_symlink = False
             recurse_opts.follow_child_symlinks = False
-        elif opt == '--dereference':
-            chown_fn = os.chown
-            explicit_deref = True
-    if recurse_opts.recurse and not explicit_deref:
+    if recurse_opts.recurse and not recurse_opts.follow_top_symlink:
         chown_fn = os.lchown
     try:
         uid, gid = lib.parse_chown_usergroup(usergroup)

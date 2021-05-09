@@ -1,9 +1,0 @@
-#!/bin/bash -e
-
-proj_dir="$(realpath $(dirname $0)/..)"
-
-docker run -w / \
-	-v $proj_dir:/proj:ro \
-	-v $proj_dir/tests/passwd:/etc/passwd:ro \
-	-v $proj_dir/tests/group:/etc/group:ro \
-	python:3-slim /proj/tests/chown_runtests

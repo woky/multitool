@@ -1,0 +1,78 @@
+# vim:ft=bash:
+set -eu -o pipefail -o errtrace
+
+debug=0
+cmd=
+
+failure()
+{
+	echo "t.chown: FAIL at line ${BASH_LINENO[@]}"
+	echo "t.chown: Command: $cmd"
+
+}
+trap failure ERR
+
+multitool()
+{
+	/proj/multitool "$@"
+}
+
+show_tree()
+{
+	find $1 -printf '%#m %U %G %p\n' | sort -k4
+}
+
+show_test_tree()
+{
+	show_tree /files
+}
+
+recreate_test_tree()
+(
+	rm -rf /files
+	umask 022
+	mkdir /files
+	mkdir /files/A
+	touch /files/A/x
+	touch /files/A/y
+	ln -s ../B/B /files/A/B
+	#ln -s ../B/nonexistent files/A/dangling # TODO
+	mkdir /files/B
+	touch /files/B/x
+	touch /files/B/y
+	ln -s ../A/x /files/B/ax
+	ln -s ../A /files/B/A
+	mkdir /files/B/B
+	touch /files/B/B/x
+	touch /files/B/B/y
+	ln -s ../../A /files/B/B/A
+)
+
+compare_files()
+{
+	if ! cmp -s $1 $2; then
+		diff -U-1 -u $1 $2 >&2
+		return 1
+	fi
+}
+
+run_with_tree()
+{
+	recreate_test_tree
+	"$@"
+	if (( debug )); then
+		echo "# $@" >&2
+		find /files -ls >&2
+	fi
+}
+
+run_show_tree()
+{
+	recreate_test_tree
+	"$@" >/dev/null
+	show_test_tree
+	if (( debug )); then
+		echo "# $@" >&2
+		find /files -ls >&2
+	fi
+}
