@@ -1,0 +1,16 @@
+#!/bin/zsh
+set -u -o pipefail -o errreturn
+
+projdir=${0:h}
+cd $projdir
+
+cleanup()
+{
+	rm -rf $temp_dir
+}
+temp_dir=$(mktemp -dt multitool.XXXXXX)
+trap cleanup INT TERM EXIT
+
+rsync -a --exclude=__pycache__ multitool $temp_dir
+mkdir -p out
+python -m zipapp $temp_dir -m multitool.main:main -o out/multitool -p /usr/bin/python3
