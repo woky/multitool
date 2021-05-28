@@ -1,16 +1,13 @@
 # vim:ft=bash:
 set -eu -o pipefail -o errtrace
 
-debug=0
-cmd=
-
-failure()
+print_error_info()
 {
-	echo "t.chown: FAIL at line ${BASH_LINENO[@]}"
-	echo "t.chown: Command: $cmd"
-
+	local frame=0
+	echo "FAILURE at"
+	while caller $frame; do ((++frame)); done | column -t -R1 | sed 's/^/  /'
 }
-trap failure ERR
+trap print_error_info ERR
 
 multitool()
 {
@@ -36,7 +33,7 @@ recreate_test_tree()
 	touch /files/A/x
 	touch /files/A/y
 	ln -s ../B/B /files/A/B
-	#ln -s ../B/nonexistent files/A/dangling # TODO
+	#ln -s ../B/nonexistent /files/A/dangling # TODO
 	mkdir /files/B
 	touch /files/B/x
 	touch /files/B/y
@@ -48,31 +45,65 @@ recreate_test_tree()
 	ln -s ../../A /files/B/B/A
 )
 
-compare_files()
+run_command()
 {
-	if ! cmp -s $1 $2; then
-		diff -U-1 -u $1 $2 >&2
+	local label=$1 cmd=$2 status=0
+	$cmd >/tmp/$label.stdout 2>/tmp/$label.stderr || status=1
+	echo $cmd >/tmp/$label.cmd
+	echo $status >/tmp/$label.status
+	printf -v ${label}_status $status
+}
+
+run_command_with_tree()
+{
+	recreate_test_tree
+	run_command "$@"
+	show_test_tree >/tmp/$1.tree
+}
+
+report_command()
+{
+	local label=$1
+	echo "Command $label:"
+	echo "  Command: $(cat /tmp/$label.cmd)"
+	echo "  Status: $(cat /tmp/$label.status)"
+	echo "  Stdout:"
+	echo "-----BEGIN-----"
+	cat /tmp/$label.stdout
+	echo "------END------"
+	echo "  Stderr:"
+	echo "-----BEGIN-----"
+	cat /tmp/$label.stderr
+	echo "------END------"
+}
+
+check_commands_success_same_tree()
+{
+	run_command_with_tree A "$1"
+	run_command_with_tree B "$2"
+	if (( A_status + B_status )); then
+		report_command A
+		report_command B
+		echo "Command(s) failed!"
+		return 1
+	fi
+	if ! cmp -s /tmp/{A,B}.tree; then
+		report_command A
+		report_command B
+		echo "Trees do not match!"
+		diff -U-1 -u /tmp/{A,B}.tree
 		return 1
 	fi
 }
 
-run_with_tree()
+check_commands_failure()
 {
-	recreate_test_tree
-	"$@"
-	if (( debug )); then
-		echo "# $@" >&2
-		find /files -ls >&2
-	fi
-}
-
-run_show_tree()
-{
-	recreate_test_tree
-	"$@" >/dev/null
-	show_test_tree
-	if (( debug )); then
-		echo "# $@" >&2
-		find /files -ls >&2
+	run_command_with_tree A "$1"
+	run_command_with_tree B "$2"
+	if (( A_status + B_status != 2 )); then
+		report_command A
+		report_command B
+		echo "Command(s) should fail but succeeded!"
+		return 1
 	fi
 }

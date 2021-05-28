@@ -3,6 +3,7 @@
 import getopt
 import sys
 import os
+from typing import List
 
 from . import lib
 
@@ -13,8 +14,8 @@ def chown_usage(chgrp: bool, exit_code=0, msg=None):
         usage = f'Usage: {sys.argv[0]} chown [option]... [owner][:[group]] <file>...'
     lib.show_usage(usage, exit_code, msg)
 
-def do_chown(args: list[str], chgrp=False):
-    opts, args = getopt.getopt(args, 'hRHLP', ['help'])
+def do_chown(args: List[str], chgrp=False):
+    opts, args = getopt.gnu_getopt(args, 'hRHLP', ['help'])
     if len(args) < 2:
         chown_usage(chgrp, 1)
     usergroup, files = args[0], args[1:]
@@ -56,10 +57,10 @@ def do_chown(args: list[str], chgrp=False):
     except OSError as e:
         sys.exit(e)
 
-def do_chgrp(args: list[str]):
+def do_chgrp(args: List[str]):
     do_chown(args, chgrp=True)
 
-def do_chmod(args: list[str]):
+def do_chmod(args: List[str]):
     pass
 
 subcommands = {
@@ -73,7 +74,7 @@ def main_usage(exit_code=0, msg=None):
     usage = f'Usage: {sys.argv[0]} {subcmds} <args>...'
     lib.show_usage(usage, exit_code, msg)
 
-def main(args: list[str] = None) -> None:
+def main(args: List[str] = None) -> None:
     if args is None:
         args = sys.argv[1:]
     try:
@@ -87,7 +88,7 @@ def main(args: list[str] = None) -> None:
         main_usage(1)
     subcmd_fn = subcommands.get(args[0])
     if not subcmd_fn:
-        main_usage(1, f"unrecognized command '{args[0]}'", file=sys.stderr)
+        main_usage(1, f"unrecognized command '{args[0]}'")
     subcmd_fn(args[1:])
 
 if __name__ == '__main__':

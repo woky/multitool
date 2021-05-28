@@ -7,9 +7,10 @@ echo "### RUNNING UNIT TESTS ###"
 pytest $proj_dir/multitool -vv
 
 echo "### RUNNING FUNCTIONAL TESTS ###"
+docker build -t multitool-test $proj_dir/tests/docker
 docker run \
 	-v $proj_dir:/proj:ro \
 	-v $proj_dir/tests/passwd:/etc/passwd:ro \
 	-v $proj_dir/tests/group:/etc/group:ro \
 	-w /proj/tests \
-	python:3-slim ./runall
+	multitool-test ./runall

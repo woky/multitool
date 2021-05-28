@@ -1,0 +1,30 @@
+#!/bin/bash -e
+source ./defs
+
+checktree() { check_commands_success_same_tree "$*" "multitool $*"; }
+checkfail() { check_commands_failure "$*" "multitool $*"; }
+
+checktree chown games /files/A
+checktree chown games: /files/A
+checktree chown 1234 /files/A
+checktree chown -R games /files/A
+checktree chown -R games /files/B
+checktree chown -R games: /files/A
+
+checktree chown -R games /files/A/B
+checktree chown -R -H games /files/A/B
+checktree chown -R -L games /files/A/B
+checktree chown -R -P games /files/A/B
+
+checktree chown news /files/B/ax
+checktree chown -h news /files/B/ax
+
+checktree chown -R nobody. /files
+
+checktree chown -R :daemon /files/A
+checktree chgrp -R daemon /files/A
+
+checkfail chown xinvalidx /files/A
+checkfail chgrp xinvalidx /files/A
+checkfail chown xinvalidx: /files/A
+checkfail chown :xinvalidx /files/A

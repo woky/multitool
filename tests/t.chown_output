@@ -1,30 +1,4 @@
 #!/bin/bash -e
 source ./defs
 
-runcheck()
-{
-	cmd="$@"
-	run_show_tree "$@" >/tmp/expected
-	run_show_tree multitool "$@" >/tmp/actual
-	compare_files /tmp/expected /tmp/actual
-}
-
-runcheck chown games /files/A
-runcheck chown games: /files/A
-runcheck chown 1234 /files/A
-runcheck chown -R games /files/A
-runcheck chown -R games /files/B
-runcheck chown -R games: /files/A
-
-runcheck chown -R games /files/A/B
-runcheck chown -R -H games /files/A/B
-runcheck chown -R -L games /files/A/B
-runcheck chown -R -P games /files/A/B
-
-runcheck chown news /files/B/ax
-runcheck chown -h news /files/B/ax
-
-runcheck chown -R nobody. /files
-
-runcheck chown -R :daemon /files/A
-runcheck chgrp -R daemon /files/A
+# TODO
